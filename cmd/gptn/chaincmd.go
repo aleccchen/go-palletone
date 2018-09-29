@@ -23,6 +23,7 @@ import (
 	"github.com/palletone/go-palletone/cmd/utils"
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/log"
+	"github.com/palletone/go-palletone/common/ptndb"
 	mp "github.com/palletone/go-palletone/consensus/mediatorplugin"
 	"github.com/palletone/go-palletone/core"
 	"github.com/palletone/go-palletone/core/accounts"
@@ -143,7 +144,7 @@ func initGenesis(ctx *cli.Context) error {
 
 	Dbconn, err := node.OpenDatabase("leveldb", 0, 0)
 	if err != nil {
-		fmt.Println("eveldb init failed")
+		fmt.Println("leveldb init failed")
 		return errors.New("leveldb init failed")
 	}
 	filepath := node.ResolvePath("leveldb")
@@ -183,10 +184,20 @@ func initGenesis(ctx *cli.Context) error {
 	//}
 	//modifyMediatorInConf(configPath, password, account.Address)
 
+
+	err = InitStateDB(Dbconn,genesis,genesisUnitHash)
+	if err != nil {
+		utils.Fatalf("Failed to InitStateDB: %v", err)
+		return err
+	}
+	return nil
+}
+
+func InitStateDB (Dbconn ptndb.Database, genesis *core.Genesis, genesisUnitHash common.Hash) error {
 	// 3, 全局属性不是交易，不需要放在Unit中
 	// @author Albert·Gou
 	gp := modules.InitGlobalProp(genesis)
-	storage.StoreGlobalProp(Dbconn, gp)
+	err := storage.StoreGlobalProp(Dbconn, gp)
 	if err != nil {
 		utils.Fatalf("Failed to write global properties: %v", err)
 		return err
@@ -195,7 +206,7 @@ func initGenesis(ctx *cli.Context) error {
 	// 4, 动态全局属性不是交易，不需要放在Unit中
 	// @author Albert·Gou
 	dgp := modules.InitDynGlobalProp(genesis, genesisUnitHash)
-	storage.StoreDynGlobalProp(Dbconn, dgp)
+	err = storage.StoreDynGlobalProp(Dbconn, dgp)
 	if err != nil {
 		utils.Fatalf("Failed to write dynamic global properties: %v", err)
 		return err
@@ -204,12 +215,11 @@ func initGenesis(ctx *cli.Context) error {
 	// 5, 初始化mediator调度器，并存在数据库
 	// @author Albert·Gou
 	ms := modules.InitMediatorSchl(gp, dgp)
-	storage.StoreMediatorSchl(Dbconn, ms)
+	err = storage.StoreMediatorSchl(Dbconn, ms)
 	if err != nil {
 		utils.Fatalf("Failed to write mediator schedule: %v", err)
 		return err
 	}
-
 	return nil
 }
 

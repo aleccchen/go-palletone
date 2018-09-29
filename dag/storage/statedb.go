@@ -36,11 +36,48 @@ import (
 
 //保存了对合约写集、Config、Asset信息
 type StateDatabase struct {
-	db ptndb.Database
+	db            ptndb.Database
+	GlobalProp    *modules.GlobalProperty
+	DynGlobalProp *modules.DynamicGlobalProperty
+	MediatorSchl  *modules.MediatorSchedule
 }
 
 func NewStateDatabase(db ptndb.Database) *StateDatabase {
-	return &StateDatabase{db: db}
+
+	gp, err := RetrieveGlobalProp(db)
+	if err != nil {
+		//log.Error(err.Error())
+		//return nil, err
+	}
+
+	dgp, err := RetrieveDynGlobalProp(db)
+	if err != nil {
+		//log.Error(err.Error())
+		//return nil, err
+	}
+
+	ms, err := RetrieveMediatorSchl(db)
+	if err != nil {
+		//log.Error(err.Error())
+		//return nil, err
+	}
+	return &StateDatabase{
+		db:            db,
+		GlobalProp:    gp,
+		DynGlobalProp: dgp,
+		MediatorSchl:  ms,         
+	}
+}
+func (statedb *StateDatabase) GetGlobalProp() *modules.GlobalProperty {
+	return statedb.GlobalProp
+}
+
+func (statedb *StateDatabase) GetDynGlobalProp() *modules.DynamicGlobalProperty {
+	return statedb.DynGlobalProp
+}
+
+func (statedb *StateDatabase) GetMediatorSchl() *modules.MediatorSchedule {
+	return statedb.MediatorSchl
 }
 
 type StateDb interface {
@@ -59,6 +96,9 @@ type StateDb interface {
 	GetContractAllState(id []byte) map[modules.ContractReadSet][]byte
 	GetTplState(id []byte, field string) (*modules.StateVersion, []byte)
 	GetContract(id common.Hash) (*modules.Contract, error)
+	GetGlobalProp() *modules.GlobalProperty
+	GetDynGlobalProp() *modules.DynamicGlobalProperty
+	GetMediatorSchl() *modules.MediatorSchedule
 }
 
 // ######################### SAVE IMPL START ###########################
