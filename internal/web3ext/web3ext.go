@@ -437,6 +437,11 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
+			name: 'encodeTx',
+			call: 'ptn_encodeTx',
+			params: 1
+		}),		
+		new web3._extend.Method({
 			name: 'getRawTransactionFromBlock',
 			call: function(args) {
 				return (web3._extend.utils.isString(args[0]) && args[0].indexOf('0x') === 0) ? 'ptn_getRawTransactionByBlockHashAndIndex' : 'ptn_getRawTransactionByBlockNumberAndIndex';
