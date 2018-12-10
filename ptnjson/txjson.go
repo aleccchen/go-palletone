@@ -72,3 +72,9 @@ func convertInvokeRequest2Json(req *modules.ContractInvokeRequestPayload) *Invok
 	}
 	return reqJson
 }
+func ConvertJson2Tx(json *TxJson) *modules.Transaction {
+	tx := &modules.Transaction{}
+	pay := ConvertJson2Payment(json.Payment)
+	tx.AddMessage(modules.NewMessage(modules.APP_PAYMENT, pay))
+	return tx
+}
