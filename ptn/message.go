@@ -211,8 +211,9 @@ func (pm *ProtocolManager) GetBlockBodiesMsg(msg p2p.Msg, p *peer) error {
 		// Retrieve the requested block body, stopping if enough was found
 		txs, err := pm.dag.GetUnitTransactions(hash)
 		if err != nil {
-			log.Debug("GetBlockBodiesMsg", "hash:",hash,"GetUnitTransactions err:", err)
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
+			log.Debug("GetBlockBodiesMsg", "hash:", hash, "GetUnitTransactions err:", err)
+			//return errResp(ErrDecode, "msg %v: %v", msg, err)
+			continue
 		}
 
 		//data, err := rlp.EncodeToBytes(txs)
@@ -223,7 +224,8 @@ func (pm *ProtocolManager) GetBlockBodiesMsg(msg p2p.Msg, p *peer) error {
 		data, err := json.Marshal(txs)
 		if err != nil {
 			log.Debug("Get body Marshal encode", "error", err.Error(), "unit hash", hash.String())
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
+			//return errResp(ErrDecode, "msg %v: %v", msg, err)
+			continue
 		}
 		log.Debug("Get body Marshal", "data:", string(data))
 		bytes += len(data)
@@ -252,6 +254,9 @@ func (pm *ProtocolManager) BlockBodiesMsg(msg p2p.Msg, p *peer) error {
 	//log.Debug("===BlockBodiesMsg===", "len(request:)", len(request))
 	transactions := make([][]*modules.Transaction, len(request))
 	for i, body := range request {
+		if len(body) == 0 {
+			continue
+		}
 		var txs modules.Transactions
 		//log.Debug("BlockBodiesMsg", "have body:", string(body))
 		if err := json.Unmarshal(body, &txs); err != nil {
@@ -391,7 +396,7 @@ func (pm *ProtocolManager) NewBlockMsg(msg p2p.Msg, p *peer) error {
 
 	unit.ReceivedAt = msg.ReceivedAt
 	unit.ReceivedFrom = p
-	log.Info("===NewBlockMsg===", "index:", unit.Number().Index)
+	log.Info("===NewBlockMsg===", "index:", unit.Number().Index, "peer id:", p.id)
 
 	// Mark the peer as owning the block and schedule it for import
 	p.MarkUnit(unit.UnitHash)
@@ -472,10 +477,10 @@ func (pm *ProtocolManager) TxMsg(msg p2p.Msg, p *peer) error {
 		p.MarkTransaction(tx.Hash())
 		txHash := tx.Hash()
 		txHash = txHash
-		_, err := pm.txpool.ProcessTransaction(tx,true, true, 0 /*pm.txpool.Tag(peer.ID())*/)
+		_, err := pm.txpool.ProcessTransaction(tx, true, true, 0 /*pm.txpool.Tag(peer.ID())*/)
 		//acceptedTxs = acceptedTxs
 		if err != nil {
-			return errResp(ErrDecode, "transaction %d not accepteable ", i,"err:",err)
+			return errResp(ErrDecode, "transaction %d not accepteable ", i, "err:", err)
 		}
 	}
 
