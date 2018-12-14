@@ -210,7 +210,7 @@ func (pm *ProtocolManager) GetBlockBodiesMsg(msg p2p.Msg, p *peer) error {
 		log.Debug("GetBlockBodiesMsg", "hash", hash)
 		// Retrieve the requested block body, stopping if enough was found
 		txs, err := pm.dag.GetUnitTransactions(hash)
-		if err != nil {
+		if err != nil || len(txs) == 0 {
 			log.Debug("GetBlockBodiesMsg", "hash:", hash, "GetUnitTransactions err:", err)
 			//return errResp(ErrDecode, "msg %v: %v", msg, err)
 			continue
@@ -268,12 +268,11 @@ func (pm *ProtocolManager) BlockBodiesMsg(msg p2p.Msg, p *peer) error {
 			msgs, err1 := storage.ConvertMsg(tx)
 			if err1 != nil {
 				log.Error("tx comvertmsg failed......", "err:", err1, "tx:", tx)
-				return err1
+				break
 			}
 			tx.TxMessages = msgs
 			temptxs = append(temptxs, tx)
 		}
-
 		transactions[i] = temptxs
 		log.Info("BlockBodiesMsg", "i", i, "txs size:", len(temptxs))
 	}
