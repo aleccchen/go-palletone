@@ -40,7 +40,7 @@ func (self *ProtocolManager) newProducedUnitBroadcastLoop() {
 			if err == nil {
 				event.Unit.StrTxs = data
 
-				self.BroadcastUnit(event.Unit, true /*, needBroadcastMediator*/)
+				//self.BroadcastUnit(event.Unit, true /*, needBroadcastMediator*/)
 				self.BroadcastUnit(event.Unit, false /*, noBroadcastMediator*/)
 			}
 
