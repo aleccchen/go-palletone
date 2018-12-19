@@ -296,6 +296,8 @@ func (t *udp) waitping(from NodeID) error {
 // findnode sends a findnode request to the given node and waits until
 // the node has sent up to k neighbors.
 func (t *udp) findnode(toid NodeID, toaddr *net.UDPAddr, target NodeID) ([]*Node, error) {
+	//log.Info("enter udp findnode", "local addr:", t.conn.LocalAddr().String())
+	//defer log.Info("end udp findnode", "local addr:", t.conn.LocalAddr().String())
 	nodes := make([]*Node, 0, bucketSize)
 	nreceived := 0
 	errc := t.pending(toid, neighborsPacket, func(r interface{}) bool {
@@ -609,7 +611,10 @@ func (req *pong) handle(t *udp, from *net.UDPAddr, fromID NodeID, mac []byte) er
 func (req *pong) name() string { return "PONG/v4" }
 
 func (req *findnode) handle(t *udp, from *net.UDPAddr, fromID NodeID, mac []byte) error {
+	//log.Info("enter findnode handle", "target node id:", req.Target.String())
+	//defer log.Info("end findnode handle", "target node id:", req.Target.String())
 	if expired(req.Expiration) {
+		//log.Info("findnode handle expired")
 		return errExpired
 	}
 	if !t.db.hasBond(fromID) {
@@ -620,8 +625,10 @@ func (req *findnode) handle(t *udp, from *net.UDPAddr, fromID NodeID, mac []byte
 		// port of the target as the source address. The recipient of
 		// the findnode packet would then send a neighbors packet
 		// (which is a much bigger packet than findnode) to the victim.
+		//log.Info("findnode handle unknown node")
 		return errUnknownNode
 	}
+
 	target := crypto.Keccak256Hash(req.Target[:])
 	t.mutex.Lock()
 	closest := t.closest(target, bucketSize).entries
