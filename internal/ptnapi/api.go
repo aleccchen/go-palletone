@@ -1563,7 +1563,9 @@ func CreateRawTransaction( /*s *rpcServer*/ c *ptnjson.CreateRawTransactionCmd) 
 	//	// some validity checks.
 	//	//only support mainnet
 	//	var params *chaincfg.Params
-	for encodedAddr, ptnAmt := range c.Amounts {
+	for _, addramt := range c.Amounts {
+		encodedAddr := addramt.Address
+		ptnAmt := addramt.Amount
 		amount := ptnjson.Ptn2Dao(ptnAmt)
 		//		// Ensure amount is in the valid range for monetary amounts.
 		if amount <= 0 || amount > ptnjson.MaxDao {
@@ -1726,12 +1728,12 @@ func (s *PublicTransactionPoolAPI) CmdCreateTransaction(ctx context.Context, fro
 	var LockTime int64
 	LockTime = 0
 
-	amounts := map[string]decimal.Decimal{}
+	amounts := []ptnjson.AddressAmt{}
 	if to == "" {
 		return "", fmt.Errorf("amounts is empty")
 	}
 
-	amounts[to] = amount
+	amounts = append(amounts, ptnjson.AddressAmt{to, amount})
 
 	utxoJsons, err := s.b.GetAddrUtxos(from)
 	if err != nil {
@@ -1759,7 +1761,7 @@ func (s *PublicTransactionPoolAPI) CmdCreateTransaction(ctx context.Context, fro
 	}
 
 	if change > 0 {
-		amounts[from] = ptnjson.Dao2Ptn(change)
+		amounts = append(amounts, ptnjson.AddressAmt{from, ptnjson.Dao2Ptn(change)})
 	}
 
 	arg := ptnjson.NewCreateRawTransactionCmd(inputs, amounts, &LockTime)
@@ -1785,12 +1787,12 @@ func (s *PublicTransactionPoolAPI) CreateRawTransaction(ctx context.Context /*s 
 		return "", nil
 	}
 	//realNet := &chaincfg.MainNetParams
-	amounts := map[string]decimal.Decimal{}
+	amounts := []ptnjson.AddressAmt{}
 	for _, outOne := range rawTransactionGenParams.Outputs {
 		if len(outOne.Address) == 0 || outOne.Amount.LessThanOrEqual(decimal.New(0, 0)) {
 			continue
 		}
-		amounts[outOne.Address] = outOne.Amount
+		amounts = append(amounts, ptnjson.AddressAmt{outOne.Address, outOne.Amount})
 	}
 	if len(amounts) == 0 {
 		return "", nil
