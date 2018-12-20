@@ -154,6 +154,7 @@ func (pm *ProtocolManager) syncer() {
 
 		case <-forceSync.C:
 			// Force a sync even if not enough peers are present
+			log.Debug("start force Sync")
 			go pm.synchronise(pm.peers.BestPeer(modules.PTNCOIN), modules.PTNCOIN)
 
 		case <-pm.noMorePeers:
@@ -165,14 +166,13 @@ func (pm *ProtocolManager) syncer() {
 
 // synchronise tries to sync up our local block chain with a remote peer.
 func (pm *ProtocolManager) synchronise(peer *peer, assetId modules.IDType16) {
-	//return
-	log.Info("=============Enter ProtocolManager synchronise===========")
-	defer log.Info("=============End ProtocolManager synchronise===========")
 	// Short circuit if no peers are available
 	if peer == nil {
 		log.Info("ProtocolManager synchronise peer is nil")
 		return
 	}
+	log.Info("Enter ProtocolManager synchronise", "peer id:", peer.id)
+	defer log.Info("End ProtocolManager synchronise", "peer id:", peer.id)
 
 	// Make sure the peer's TD is higher than our own
 	//TODO compare local assetId & chainIndex whith remote peer assetId & chainIndex
@@ -186,7 +186,7 @@ func (pm *ProtocolManager) synchronise(peer *peer, assetId modules.IDType16) {
 	pindex := number.Index
 
 	log.Info("ProtocolManager", "synchronise local unit index:", index, "local peer index:", pindex, "header hash:", pHead)
-	if common.EmptyHash(pHead) || (index > pindex && pindex > 0) {
+	if common.EmptyHash(pHead) || (index >= pindex && pindex > 0) {
 		//if index >= pindex && pindex > 0 {
 		log.Info("===synchronise peer.index < local index===", "local peer.index:", pindex, "local index:", number.Index, "header hash:", pHead)
 		return
@@ -220,7 +220,7 @@ func (pm *ProtocolManager) synchronise(peer *peer, assetId modules.IDType16) {
 
 	head := pm.dag.CurrentUnit()
 	if head != nil && head.UnitHeader.Number.Index > 0 {
-		go pm.BroadcastUnit(head, false/*, noBroadcastMediator*/)
+		go pm.BroadcastUnit(head, false /*, noBroadcastMediator*/)
 	}
 
 }

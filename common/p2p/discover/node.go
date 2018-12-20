@@ -33,7 +33,6 @@ import (
 
 	"github.com/palletone/go-palletone/common"
 	"github.com/palletone/go-palletone/common/crypto"
-	// "github.com/palletone/go-palletone/common/crypto/secp256k1"
 )
 
 const NodeIDBits = 512
@@ -176,7 +175,13 @@ func parseComplete(rawurl string) (*Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid host: %v", err)
 	}
-	if ip = net.ParseIP(host); ip == nil {
+
+	addrs, err := net.LookupHost(host)
+	if err != nil {
+		return nil, fmt.Errorf("invalid lookup host: %v", err)
+	}
+
+	if ip = net.ParseIP(addrs[0]); ip == nil {
 		return nil, errors.New("invalid IP address")
 	}
 	// Ensure the IP is 4 bytes long for IPv4 addresses.
@@ -214,6 +219,7 @@ func (n *Node) MarshalText() ([]byte, error) {
 
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (n *Node) UnmarshalText(text []byte) error {
+	//panic("UnmarshalText"+string(text))
 	dec, err := ParseNode(string(text))
 	if err == nil {
 		*n = *dec

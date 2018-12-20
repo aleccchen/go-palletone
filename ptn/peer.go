@@ -290,7 +290,7 @@ func (p *peer) RequestHeadersByNumber(origin modules.ChainIndex, amount int, ski
 // RequestBodies fetches a batch of blocks' bodies corresponding to the hashes
 // specified.
 func (p *peer) RequestBodies(hashes []common.Hash) error {
-	log.Debug("Fetching batch of block bodies", "count", len(hashes))
+	log.Debug("Fetching batch of block bodies", "peer id:", p.id, "count", len(hashes))
 	return p2p.Send(p.rw, GetBlockBodiesMsg, hashes)
 }
 
@@ -587,13 +587,17 @@ func (ps *peerSet) BestPeer(assetId modules.IDType16) *peer {
 
 	var (
 		bestPeer *peer
-		bestTd   uint64 //*big.Int
+		bestTd   uint64 = 0 //*big.Int
 	)
 	for _, p := range ps.peers {
 		if _, number := p.Head(assetId); bestPeer == nil || number.Index > bestTd /*td.Cmp(bestTd) > 0*/ {
 			bestPeer, bestTd = p, number.Index
 		}
 	}
+	if bestPeer != nil {
+		log.Debug("peerSet", "BestPeer:", bestPeer.id)
+	}
+
 	return bestPeer
 }
 

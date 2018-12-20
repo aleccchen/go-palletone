@@ -868,6 +868,9 @@ func (s *PublicBlockChainAPI) Ccstop(ctx context.Context, deployId string, txid 
 func (s *PublicBlockChainAPI) DecodeTx(ctx context.Context, hex string) (string, error) {
 	return s.b.DecodeTx(hex)
 }
+func (s *PublicBlockChainAPI) EncodeTx(ctx context.Context, json string) (string, error) {
+	return s.b.EncodeTx(json)
+}
 
 func (s *PublicBlockChainAPI) Ccinvoketx(ctx context.Context, deployId string, txid string, txhex string, param []string) (string, error) {
 	depId, _ := hex.DecodeString(deployId)
@@ -1560,7 +1563,9 @@ func CreateRawTransaction( /*s *rpcServer*/ c *ptnjson.CreateRawTransactionCmd) 
 	//	// some validity checks.
 	//	//only support mainnet
 	//	var params *chaincfg.Params
-	for encodedAddr, ptnAmt := range c.Amounts {
+	for _, addramt := range c.Amounts {
+		encodedAddr := addramt.Address
+		ptnAmt := addramt.Amount
 		amount := ptnjson.Ptn2Dao(ptnAmt)
 		//		// Ensure amount is in the valid range for monetary amounts.
 		if amount <= 0 || amount > ptnjson.MaxDao {
@@ -1723,12 +1728,12 @@ func (s *PublicTransactionPoolAPI) CmdCreateTransaction(ctx context.Context, fro
 	var LockTime int64
 	LockTime = 0
 
-	amounts := map[string]decimal.Decimal{}
+	amounts := []ptnjson.AddressAmt{}
 	if to == "" {
 		return "", fmt.Errorf("amounts is empty")
 	}
 
-	amounts[to] = amount
+	amounts = append(amounts, ptnjson.AddressAmt{to, amount})
 
 	utxoJsons, err := s.b.GetAddrUtxos(from)
 	if err != nil {
@@ -1736,7 +1741,8 @@ func (s *PublicTransactionPoolAPI) CmdCreateTransaction(ctx context.Context, fro
 	}
 	utxos := core.Utxos{}
 	for _, json := range utxoJsons {
-		utxos = append(utxos, &json)
+		//utxos = append(utxos, &json)
+		utxos = append(utxos, &ptnjson.UtxoJson{TxHash: json.TxHash, MessageIndex: json.MessageIndex, OutIndex: json.OutIndex, Amount: json.Amount, Asset: json.Asset, PkScriptHex: json.PkScriptHex, PkScriptString: json.PkScriptString, LockTime: json.LockTime})
 	}
 	daoAmount := ptnjson.Ptn2Dao(amount.Add(fee))
 	taken_utxo, change, err := core.Select_utxo_Greedy(utxos, daoAmount)
@@ -1755,7 +1761,7 @@ func (s *PublicTransactionPoolAPI) CmdCreateTransaction(ctx context.Context, fro
 	}
 
 	if change > 0 {
-		amounts[from] = ptnjson.Dao2Ptn(change)
+		amounts = append(amounts, ptnjson.AddressAmt{from, ptnjson.Dao2Ptn(change)})
 	}
 
 	arg := ptnjson.NewCreateRawTransactionCmd(inputs, amounts, &LockTime)
@@ -1781,12 +1787,12 @@ func (s *PublicTransactionPoolAPI) CreateRawTransaction(ctx context.Context /*s 
 		return "", nil
 	}
 	//realNet := &chaincfg.MainNetParams
-	amounts := map[string]decimal.Decimal{}
+	amounts := []ptnjson.AddressAmt{}
 	for _, outOne := range rawTransactionGenParams.Outputs {
 		if len(outOne.Address) == 0 || outOne.Amount.LessThanOrEqual(decimal.New(0, 0)) {
 			continue
 		}
-		amounts[outOne.Address] = outOne.Amount
+		amounts = append(amounts, ptnjson.AddressAmt{outOne.Address, outOne.Amount})
 	}
 	if len(amounts) == 0 {
 		return "", nil
@@ -1959,6 +1965,42 @@ func (s *PublicTransactionPoolAPI) getTxUtxoLockScript(tx *modules.Transaction) 
 		}
 	}
 	return result
+}
+
+//转为压力测试准备数据用
+func (s *PublicTransactionPoolAPI) BatchSign(ctx context.Context, txid string, fromAddress, toAddress string, amount int, count int, password string) ([]string, error) {
+	txHash, _ := common.NewHashFromStr(txid)
+	toAddr, _ := common.StringToAddress(toAddress)
+	fromAddr, _ := common.StringToAddress(fromAddress)
+	utxoScript := tokenengine.GenerateLockScript(fromAddr)
+	ks := s.b.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	ks.Unlock(accounts.Account{Address: fromAddr}, password)
+	pubKey, _ := ks.GetPublicKey(fromAddr)
+	result := []string{}
+	for i := 0; i < count; i++ {
+		tx := &modules.Transaction{}
+		pay := &modules.PaymentPayload{}
+		outPoint := modules.NewOutPoint(txHash, 0, uint32(i))
+		pay.AddTxIn(modules.NewTxIn(outPoint, []byte{}))
+		lockScript := tokenengine.GenerateLockScript(toAddr)
+		pay.AddTxOut(modules.NewTxOut(uint64(amount*100000000), lockScript, modules.NewPTNAsset()))
+		tx.AddMessage(modules.NewMessage(modules.APP_PAYMENT, pay))
+		utxoLookup := map[modules.OutPoint][]byte{}
+		utxoLookup[*outPoint] = utxoScript
+		errs, err := tokenengine.SignTxAllPaymentInput(tx, 1, utxoLookup, nil, func(addresses common.Address) ([]byte, error) {
+			return pubKey, nil
+		},
+			func(addresses common.Address, hash []byte) ([]byte, error) {
+				account := accounts.Account{Address: addresses}
+				return ks.SignHash(account, hash)
+			}, 0)
+		if len(errs) > 0 || err != nil {
+			return nil, err
+		}
+		encodeTx, _ := rlp.EncodeToBytes(tx)
+		result = append(result, hex.EncodeToString(encodeTx))
+	}
+	return result, nil
 }
 
 //sign rawtranscation

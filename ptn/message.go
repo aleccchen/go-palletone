@@ -210,9 +210,10 @@ func (pm *ProtocolManager) GetBlockBodiesMsg(msg p2p.Msg, p *peer) error {
 		log.Debug("GetBlockBodiesMsg", "hash", hash)
 		// Retrieve the requested block body, stopping if enough was found
 		txs, err := pm.dag.GetUnitTransactions(hash)
-		if err != nil {
-			log.Debug("GetBlockBodiesMsg", "GetUnitTransactions err:", err)
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
+		if err != nil || len(txs) == 0 {
+			log.Debug("GetBlockBodiesMsg", "hash:", hash, "GetUnitTransactions err:", err)
+			//return errResp(ErrDecode, "msg %v: %v", msg, err)
+			continue
 		}
 
 		//data, err := rlp.EncodeToBytes(txs)
@@ -223,7 +224,8 @@ func (pm *ProtocolManager) GetBlockBodiesMsg(msg p2p.Msg, p *peer) error {
 		data, err := json.Marshal(txs)
 		if err != nil {
 			log.Debug("Get body Marshal encode", "error", err.Error(), "unit hash", hash.String())
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
+			//return errResp(ErrDecode, "msg %v: %v", msg, err)
+			continue
 		}
 		log.Debug("Get body Marshal", "data:", string(data))
 		bytes += len(data)
@@ -252,6 +254,9 @@ func (pm *ProtocolManager) BlockBodiesMsg(msg p2p.Msg, p *peer) error {
 	//log.Debug("===BlockBodiesMsg===", "len(request:)", len(request))
 	transactions := make([][]*modules.Transaction, len(request))
 	for i, body := range request {
+		if len(body) == 0 {
+			continue
+		}
 		var txs modules.Transactions
 		//log.Debug("BlockBodiesMsg", "have body:", string(body))
 		if err := json.Unmarshal(body, &txs); err != nil {
@@ -263,12 +268,11 @@ func (pm *ProtocolManager) BlockBodiesMsg(msg p2p.Msg, p *peer) error {
 			msgs, err1 := storage.ConvertMsg(tx)
 			if err1 != nil {
 				log.Error("tx comvertmsg failed......", "err:", err1, "tx:", tx)
-				return err1
+				break
 			}
 			tx.TxMessages = msgs
 			temptxs = append(temptxs, tx)
 		}
-
 		transactions[i] = temptxs
 		log.Info("BlockBodiesMsg", "i", i, "txs size:", len(temptxs))
 	}
@@ -391,7 +395,7 @@ func (pm *ProtocolManager) NewBlockMsg(msg p2p.Msg, p *peer) error {
 
 	unit.ReceivedAt = msg.ReceivedAt
 	unit.ReceivedFrom = p
-	log.Info("===NewBlockMsg===", "index:", unit.Number().Index)
+	log.Info("===NewBlockMsg===", "index:", unit.Number().Index, "peer id:", p.id)
 
 	// Mark the peer as owning the block and schedule it for import
 	p.MarkUnit(unit.UnitHash)
@@ -424,7 +428,8 @@ func (pm *ProtocolManager) NewBlockMsg(msg p2p.Msg, p *peer) error {
 type Tag uint64
 
 func (pm *ProtocolManager) TxMsg(msg p2p.Msg, p *peer) error {
-	log.Info("===============ProtocolManager TxMsg====================")
+	log.Info("Enter ProtocolManager TxMsg")
+	defer log.Info("End ProtocolManager TxMsg")
 	// Transactions arrived, make sure we have a valid and fresh chain to handle them
 	if atomic.LoadUint32(&pm.acceptTxs) == 0 {
 		log.Debug("ProtocolManager handlmsg TxMsg pm.acceptTxs==0")
@@ -471,10 +476,10 @@ func (pm *ProtocolManager) TxMsg(msg p2p.Msg, p *peer) error {
 		p.MarkTransaction(tx.Hash())
 		txHash := tx.Hash()
 		txHash = txHash
-		_, err := pm.txpool.ProcessTransaction(tx,true, true, 0 /*pm.txpool.Tag(peer.ID())*/)
+		_, err := pm.txpool.ProcessTransaction(tx, true, true, 0 /*pm.txpool.Tag(peer.ID())*/)
 		//acceptedTxs = acceptedTxs
 		if err != nil {
-			return errResp(ErrDecode, "transaction %d not accepteable ", i,"err:",err)
+			return errResp(ErrDecode, "transaction %d not accepteable ", i, "err:", err)
 		}
 	}
 
