@@ -80,11 +80,15 @@ func (view *UtxoViewpoint) SpentUtxo(db storage.IUtxoDb, outpoints map[modules.O
 	return nil
 }
 func (view *UtxoViewpoint) FetchUnitUtxos(db storage.IUtxoDb, unit *modules.Unit) error {
-	txInFlight := map[common.Hash]int{}
 	transactions := unit.Transactions()
+	if len(transactions) <= 1 {
+		return nil
+	}
+	txInFlight := map[common.Hash]int{}
 	for i, tx := range transactions {
 		txInFlight[tx.Hash()] = i
 	}
+
 	neededSet := make(map[modules.OutPoint]struct{})
 	for i, tx := range transactions[1:] {
 		// It is acceptable for a transaction input to reference
